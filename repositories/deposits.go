@@ -3,12 +3,30 @@ package repositories
 import (
 	"context"
 	"fmt"
+	"math"
 	"portfolio-investment/configs"
 	"portfolio-investment/database"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+// PRIVATE: Get current fund for user's portfolio
+func getFund(
+	tx *gorm.DB,
+	userID uint,
+	portfolioID uint,
+) (float64, error) {
+	var userPortfolio database.UserPortfolio
+	err := tx.Where(&database.UserPortfolio{
+		UserID:      userID,
+		PortfolioID: portfolioID,
+	}).First(&userPortfolio).Error
+	if err != nil {
+		return 0, fmt.Errorf("failed to get user portfolio (user: %d, portfolio: %d): %w", userID, portfolioID, err)
+	}
+	return userPortfolio.Fund, nil
+}
 
 // PRIVATE: Allocate funds to each plan based on the plan amounts
 // Returns allocated funds per portfolio => { PortfolioReferenceID : Allocated Fund }
@@ -65,7 +83,8 @@ func allocateFunds(
 			remainder = 0
 		}
 
-		fmt.Printf("\t\t- Allocated %f to '%s' deposit plan. Remainder: %f\n", deposit.Amount, plan.Portfolio.ReferenceID, remainder)
+		fmt.Printf("\t\t- Allocated %f to '%s' deposit plan. Total: %f, Remainder: %f\n",
+			deposit.Amount, plan.Portfolio.ReferenceID, results[plan.Portfolio.ReferenceID], remainder)
 
 		if remainder <= 0 {
 			break
@@ -118,7 +137,7 @@ func DepositFunds(
 	plans []database.UserDepositPlan,
 ) (map[string]float64, error) {
 
-	results := make(map[string]float64)
+	deposits := make(map[string]float64)
 
 	// Use a transaction to ensure atomicity
 	// Calculate total amount to be allocated
@@ -130,12 +149,16 @@ func DepositFunds(
 			// Strategy:
 			// 1. First allocate funds to 'one-time' plan portfolios till planned amount is met
 			// 2. Then allocate funds to 'monthly' plan portfolios till planned amount is met
-			// 3. If both both 'one-time' & 'monthly' planned amount are met, distribute funds equally to both
+			// 3. If both 'one-time' & 'monthly' planned amount are met, distribute funds equally to both
+
+			// Track all plan portfolios
+			portfolios := make(map[string]database.Portfolio)
 
 			// Separate plans into one-time and monthly
 			var oneTimePlans []database.UserDepositPlan
 			var monthlyPlans []database.UserDepositPlan
 			for _, plan := range plans {
+				portfolios[plan.Portfolio.ReferenceID] = plan.Portfolio
 				switch plan.Type {
 				case configs.PlanTypeOnceTime:
 					oneTimePlans = append(oneTimePlans, plan)
@@ -147,96 +170,124 @@ func DepositFunds(
 				return fmt.Errorf("no deposit plans found for user %s", transaction.User.ReferenceID)
 			}
 
-			// Get total funds and plan amount for 'one-time' plans
-			totalOneTimeFund := 0.0
-			totalOneTimePlanAmount := 0.0
-			for _, plan := range oneTimePlans {
-				var userPortfolio database.UserPortfolio
-				err := tx.Where(&database.UserPortfolio{
-					User:      database.User{ReferenceID: transaction.User.ReferenceID},
-					Portfolio: database.Portfolio{ReferenceID: plan.Portfolio.ReferenceID},
-				}).First(&userPortfolio).Error
-				if err != nil {
-					return fmt.Errorf("failed to get user portfolio for plan %s: %w", plan.Portfolio.Name, err)
+			// Get total current funds and total planned amounts for one-time and monthly plans
+			totalOneTimeFund, totalOneTimePlanAmount := 0.0, 0.0
+			totalMonthlyFund, totalMonthlyPlanAmount := 0.0, 0.0
+
+			// Calculate total funds and planned amounts for both types
+			if len(oneTimePlans) > 0 {
+				for _, plan := range oneTimePlans {
+					totalOneTimePlanAmount += plan.Amount
+					fund, err := getFund(tx, plan.User.ID, plan.Portfolio.ID)
+					if err != nil {
+						return err
+					}
+					totalOneTimeFund += fund
 				}
-				totalOneTimeFund += userPortfolio.Fund
-				totalOneTimePlanAmount += plan.Amount
+			}
+			if len(monthlyPlans) > 0 {
+				for _, plan := range monthlyPlans {
+					totalMonthlyPlanAmount += plan.Amount
+					fund, err := getFund(tx, plan.User.ID, plan.Portfolio.ID)
+					if err != nil {
+						return err
+					}
+					totalMonthlyFund += fund
+				}
 			}
 
-			// If monthly plans are empty, allocate funds to one-time plans
-			// Else, first check if sum of total funds for 'one-time' plan portfolios is less than the planned amount,
-			// - If true, then deposit to 'one-time' plan first before allocating the remaining funds to 'monthly' plan
-
+			// Begin allocation
 			remainingFund := transaction.Amount
-			remainingOneTimeFund := totalOneTimePlanAmount - totalOneTimeFund
+			results := make(map[string]float64)
 
-			oneTimeAllocation := remainingFund
-			if len(monthlyPlans) > 0 && remainingOneTimeFund < oneTimeAllocation {
-				oneTimeAllocation = remainingOneTimeFund
-			}
+			// Step 1: Allocate to 'one-time' plans
+			remainingOneTimeAllocation := totalOneTimePlanAmount - totalOneTimeFund
+			oneTimeAllocation := math.Min(remainingFund, remainingOneTimeAllocation)
 
-			// Deposit allocated funds into the 'one-time' plan portfolios
-			if oneTimeAllocation > 0 || (len(monthlyPlans) == 0 && remainingOneTimeFund == 0) {
+			if oneTimeAllocation > 0 {
 				fmt.Printf("\t- Depositing %.2f to one-time plans for user %s\n", oneTimeAllocation, transaction.User.ReferenceID)
 				oneTimeResult, err := allocateFunds(tx, oneTimePlans, &transaction, oneTimeAllocation)
 				if err != nil {
-					return fmt.Errorf("failed to deposit funds: %w", err)
+					return fmt.Errorf("failed to deposit to one-time plans: %w", err)
 				}
-
-				// Populate resulting funds for each portfolio
 				for portfolioReferenceID, funds := range oneTimeResult {
-					if _, exists := results[portfolioReferenceID]; !exists {
-						results[portfolioReferenceID] = 0
-					}
 					results[portfolioReferenceID] += funds
-					fmt.Printf("\t\t - Increased portfolio '%s' total funds by %f to %f \n", portfolioReferenceID, funds, results[portfolioReferenceID])
 				}
-
-				// Deduct allocated amount from remaining fund
 				remainingFund -= oneTimeAllocation
 			}
 
-			// Deposit remaining funds into the 'monthly' plan portfolios
-			if remainingFund > 0 {
-				fmt.Printf("\t- Depositing %.2f to monthly plans for user %s\n", remainingFund, transaction.User.ReferenceID)
-				monthlyResult, err := allocateFunds(tx, monthlyPlans, &transaction, remainingFund)
+			// Step 2: Allocate to 'monthly' plans
+			remainingMonthlyAllocation := totalMonthlyPlanAmount - totalMonthlyFund
+			monthlyAllocation := math.Min(remainingFund, remainingMonthlyAllocation)
 
-				// Populate resulting funds for each portfolio
+			if monthlyAllocation > 0 {
+				fmt.Printf("\t- Depositing %.2f to monthly plans for user %s\n", monthlyAllocation, transaction.User.ReferenceID)
+				monthlyResult, err := allocateFunds(tx, monthlyPlans, &transaction, monthlyAllocation)
+				if err != nil {
+					return fmt.Errorf("failed to deposit to monthly plans: %w", err)
+				}
 				for portfolioReferenceID, funds := range monthlyResult {
-					if _, exists := results[portfolioReferenceID]; !exists {
-						results[portfolioReferenceID] = 0
-					}
 					results[portfolioReferenceID] += funds
-					fmt.Printf("\t\t - Increased portfolio '%s' total funds by %f to %f \n", portfolioReferenceID, funds, results[portfolioReferenceID])
+				}
+				remainingFund -= monthlyAllocation
+			}
+
+			// Step 3: Split remaining fund equally if both are fully funded
+			if remainingFund > 0 && remainingOneTimeAllocation <= 0 && remainingMonthlyAllocation <= 0 {
+				splitFund := remainingFund / 2
+
+				if len(oneTimePlans) > 0 {
+					fmt.Printf("\t- Equally splitting: Depositing %.2f to one-time plans for user %s\n", splitFund, transaction.User.ReferenceID)
+					oneTimeResult, err := allocateFunds(tx, oneTimePlans, &transaction, splitFund)
+					if err != nil {
+						return fmt.Errorf("failed to deposit to one-time plans in split: %w", err)
+					}
+					for portfolioReferenceID, funds := range oneTimeResult {
+						results[portfolioReferenceID] += funds
+					}
 				}
 
-				if err != nil {
-					return fmt.Errorf("failed to deposit funds: %w", err)
+				if len(monthlyPlans) > 0 {
+					fmt.Printf("\t- Equally splitting: Depositing %.2f to monthly plans for user %s\n", splitFund, transaction.User.ReferenceID)
+					monthlyResult, err := allocateFunds(tx, monthlyPlans, &transaction, splitFund)
+					if err != nil {
+						return fmt.Errorf("failed to deposit to monthly plans in split: %w", err)
+					}
+					for portfolioReferenceID, funds := range monthlyResult {
+						results[portfolioReferenceID] += funds
+					}
 				}
 			}
 
 			// Update user portfolio funds
 			for portfolioReferenceID, funds := range results {
-				err := tx.Model(&database.UserPortfolio{}).Where(&database.UserPortfolio{
-					UserID:      transaction.ID,
-					PortfolioID: database.Portfolio{ReferenceID: portfolioReferenceID}.ID,
-				}).Updates(&database.UserPortfolio{Fund: funds}).Error
+				var userPortfolio database.UserPortfolio
+				err := tx.Where(&database.UserPortfolio{
+					UserID:      transaction.User.ID,
+					PortfolioID: portfolios[portfolioReferenceID].ID,
+				}).First(&userPortfolio).Error
 				if err != nil {
-					return fmt.Errorf("failed to update portfolio funds: %w", err)
+					return fmt.Errorf("failed to get user portfolio for reference ID (%s): %w", portfolioReferenceID, err)
 				}
+				userPortfolio.Fund += funds
+				err = tx.Save(&userPortfolio).Error
+				if err != nil {
+					return fmt.Errorf("failed to update user portfolio funds: %w", err)
+				}
+				deposits[portfolioReferenceID] = userPortfolio.Fund
 			}
 
-			// Update the transaction as processed
+			// Mark transaction as processed
 			transaction.Processed = true
 			err := tx.Save(&transaction).Error
 			if err != nil {
-				return fmt.Errorf("failed to transaction status: %w", err)
+				return fmt.Errorf("failed to update transaction status: %w", err)
 			}
+
 		}
 
 		return nil
-
 	})
 
-	return results, err
+	return deposits, err
 }

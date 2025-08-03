@@ -17,9 +17,14 @@ func GetUser(ctx *context.Context, referenceID string) (*database.User, error) {
 
 // PUBLIC: Get user's portfolios by reference ID
 func GetUserPortfolios(ctx *context.Context, referenceID string) ([]database.UserPortfolio, error) {
+	user, err := GetUser(ctx, referenceID)
+	if err != nil {
+		return nil, err
+	}
+
 	var userPortfolios []database.UserPortfolio
-	err := database.WithContext(ctx).Preload("User").Preload("Portfolio").Where(
-		&database.UserPortfolio{User: database.User{ReferenceID: referenceID}},
+	err = database.WithContext(ctx).Preload("User").Preload("Portfolio").Where(
+		&database.UserPortfolio{UserID: user.ID},
 	).Find(&userPortfolios).Error
 	if err != nil {
 		return nil, err
@@ -29,9 +34,14 @@ func GetUserPortfolios(ctx *context.Context, referenceID string) ([]database.Use
 
 // PUBLIC: Get user's deposit plan record(s) by reference ID
 func GetUserDepositPlans(ctx *context.Context, referenceID string) ([]database.UserDepositPlan, error) {
+	user, err := GetUser(ctx, referenceID)
+	if err != nil {
+		return nil, err
+	}
+
 	var userDepositPlans []database.UserDepositPlan
-	err := database.WithContext(ctx).Preload("User").Preload("Portfolio").Where(
-		&database.UserDepositPlan{User: database.User{ReferenceID: referenceID}},
+	err = database.WithContext(ctx).Preload("User").Preload("Portfolio").Where(
+		&database.UserDepositPlan{UserID: user.ID},
 	).Find(&userDepositPlans).Error
 	if err != nil {
 		return nil, err

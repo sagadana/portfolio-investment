@@ -6,7 +6,7 @@ import (
 	"portfolio-investment/repositories"
 )
 
-func GetTotalFunds(ctx *context.Context, userReferenceID string) (float64, error) {
+func GetUserTotalFunds(ctx *context.Context, userReferenceID string) (float64, error) {
 	// Get user portfolios
 	userPortfolios, err := repositories.GetUserPortfolios(ctx, userReferenceID)
 	if err != nil {
@@ -38,7 +38,6 @@ func GetPortfolioTotalFunds(ctx *context.Context, userReferenceID string) (map[s
 			totals[portfolioReferenceID] = 0
 		}
 		totals[portfolioReferenceID] += userPortfolio.Fund
-		fmt.Printf("Added %f to portfolio %s\n", userPortfolio.Fund, portfolioReferenceID)
 	}
 
 	return totals, nil
@@ -54,9 +53,11 @@ func ProcessFunds(
 	for _, fund := range funds {
 		if fund > 0 {
 			validFunds = append(validFunds, fund)
-		} else {
-			fmt.Printf("Skipping invalid fund amount: %.2f\n", fund)
 		}
+	}
+	if len(validFunds) == 0 {
+		fmt.Printf("No valid fund(s)")
+		return nil, nil
 	}
 
 	// Create a transaction for the deposit
