@@ -6,30 +6,79 @@ import (
 	"portfolio-investment/repositories"
 )
 
+func GetTotalFunds(ctx *context.Context, userReferenceID string) (float64, error) {
+	// Get user portfolios
+	userPortfolios, err := repositories.GetUserPortfolios(ctx, userReferenceID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get user portfolios: %w", err)
+	}
+
+	// Calculate total funds
+	total := 0.0
+	for _, userPortfolio := range userPortfolios {
+		total += userPortfolio.Fund
+	}
+
+	return total, nil
+}
+
+func GetPortfolioTotalFunds(ctx *context.Context, userReferenceID string) (map[string]float64, error) {
+	// Get user portfolios
+	userPortfolios, err := repositories.GetUserPortfolios(ctx, userReferenceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user portfolios: %w", err)
+	}
+
+	totals := make(map[string]float64)
+
+	// Calculate total funds
+	for _, userPortfolio := range userPortfolios {
+		portfolioReferenceID := userPortfolio.Portfolio.ReferenceID
+		if _, exists := totals[portfolioReferenceID]; !exists {
+			totals[portfolioReferenceID] = 0
+		}
+		totals[portfolioReferenceID] += userPortfolio.Fund
+		fmt.Printf("Added %f to portfolio %s\n", userPortfolio.Fund, portfolioReferenceID)
+	}
+
+	return totals, nil
+}
+
 func ProcessFunds(
 	ctx *context.Context,
 	userReferenceID string,
-	fund float64,
-) error {
+	funds []float64,
+) (map[string]float64, error) {
+
+	validFunds := []float64{}
+	for _, fund := range funds {
+		if fund > 0 {
+			validFunds = append(validFunds, fund)
+		} else {
+			fmt.Printf("Skipping invalid fund amount: %.2f\n", fund)
+		}
+	}
 
 	// Create a transaction for the deposit
-	transaction, err := repositories.CreateDepositTransaction(ctx, userReferenceID, fund)
+	transactions, err := repositories.CreateDepositTransactions(ctx, userReferenceID, validFunds)
 	if err != nil {
-		return fmt.Errorf("failed to create deposit transaction: %w", err)
+		return nil, fmt.Errorf("failed to create deposit transaction: %w", err)
 	}
+
+	fmt.Printf("Processing funds for user (%s). Funds: %v\n", userReferenceID, funds)
 
 	// Get user deposit plans
 	plans, err := repositories.GetUserDepositPlans(ctx, userReferenceID)
 	if err != nil {
-		return fmt.Errorf("failed to get user one-time deposit plans: %w", err)
+		return nil, fmt.Errorf("failed to get user one-time deposit plans: %w", err)
 	}
 
 	// Deposit funds into the plans
-	err = repositories.DepositFunds(ctx, transaction, plans)
+	results, err := repositories.DepositFunds(ctx, transactions, plans)
 	if err != nil {
-		return fmt.Errorf("failed to deposit funds: %w", err)
+		return nil, fmt.Errorf("failed to deposit funds: %w", err)
 	}
 
-	fmt.Printf("Compleded depositing %.2f to user's deposit plan(s) portfolios %s\n", transaction.Amount, userReferenceID)
-	return nil
+	fmt.Printf("Completed depositing funds to user (%s). Funds: %v\n", userReferenceID, funds)
+	return results, nil
 }

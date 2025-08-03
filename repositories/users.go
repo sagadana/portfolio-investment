@@ -15,10 +15,24 @@ func GetUser(ctx *context.Context, referenceID string) (*database.User, error) {
 	return &user, nil
 }
 
+// PUBLIC: Get user's portfolios by reference ID
+func GetUserPortfolios(ctx *context.Context, referenceID string) ([]database.UserPortfolio, error) {
+	var userPortfolios []database.UserPortfolio
+	err := database.WithContext(ctx).Preload("User").Preload("Portfolio").Where(
+		&database.UserPortfolio{User: database.User{ReferenceID: referenceID}},
+	).Find(&userPortfolios).Error
+	if err != nil {
+		return nil, err
+	}
+	return userPortfolios, nil
+}
+
 // PUBLIC: Get user's deposit plan record(s) by reference ID
 func GetUserDepositPlans(ctx *context.Context, referenceID string) ([]database.UserDepositPlan, error) {
 	var userDepositPlans []database.UserDepositPlan
-	err := database.WithContext(ctx).Where(&database.UserDepositPlan{User: database.User{ReferenceID: referenceID}}).Find(&userDepositPlans).Error
+	err := database.WithContext(ctx).Preload("User").Preload("Portfolio").Where(
+		&database.UserDepositPlan{User: database.User{ReferenceID: referenceID}},
+	).Find(&userDepositPlans).Error
 	if err != nil {
 		return nil, err
 	}

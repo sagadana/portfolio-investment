@@ -40,8 +40,8 @@ func Seed(db *gorm.DB) {
 	var userDepositPlans []UserDepositPlan
 
 	for _, portfolio := range portfolios {
-		switch portfolio.Name {
-		case "Retirement":
+		switch portfolio.ReferenceID {
+		case configs.DefaultPortfolioRetirement:
 			userPortfolio := UserPortfolio{
 				User:      user,
 				Portfolio: portfolio,
@@ -51,17 +51,17 @@ func Seed(db *gorm.DB) {
 				User:      user,
 				Type:      configs.PlanTypeOnceTime,
 				Portfolio: portfolio,
-				Amount:    1000.0, // Example amount
+				Amount:    500.0,
 			}
 			monthlyPlan := UserDepositPlan{
 				User:      user,
 				Type:      configs.PlanTypeMonthly,
 				Portfolio: portfolio,
-				Amount:    100.0, // Example amount
+				Amount:    100.0,
 			}
 			userPortfolios = append(userPortfolios, userPortfolio)
 			userDepositPlans = append(userDepositPlans, oneTimePlan, monthlyPlan)
-		case "High Risk":
+		case configs.DefaultPortfolioHighRisk:
 			userPortfolio := UserPortfolio{
 				User:      user,
 				Portfolio: portfolio,
@@ -71,13 +71,13 @@ func Seed(db *gorm.DB) {
 				User:      user,
 				Type:      configs.PlanTypeOnceTime,
 				Portfolio: portfolio,
-				Amount:    500.0, // Example amount
+				Amount:    10000.0,
 			}
 			monthlyPlan := UserDepositPlan{
 				User:      user,
 				Type:      configs.PlanTypeMonthly,
 				Portfolio: portfolio,
-				Amount:    100.0, // Example amount
+				Amount:    0.0,
 			}
 			userPortfolios = append(userPortfolios, userPortfolio)
 			userDepositPlans = append(userDepositPlans, oneTimePlan, monthlyPlan)

@@ -29,3 +29,8 @@ const (
 	TrxnTypeDeposit    TransactionType = "deposit"
 	TrxnTypeWithdrawal TransactionType = "withdrawal"
 )
+
+const (
+	DefaultPortfolioRetirement string = "portfolio-retirement"
+	DefaultPortfolioHighRisk   string = "portfolio-high-risk"
+)

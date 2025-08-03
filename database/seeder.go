@@ -1,13 +1,15 @@
 package database
 
 import (
+	"portfolio-investment/configs"
+
 	"gorm.io/gorm"
 )
 
 func SeedPortfolios(db *gorm.DB) []Portfolio {
 	portfolios := []Portfolio{
 		{
-			ReferenceID: "portfolio-retirement",
+			ReferenceID: configs.DefaultPortfolioRetirement,
 			Name:        "Retirement",
 			Assets: []Asset{
 				{Name: "Apple Inc.", Class: "Stock"},
@@ -15,7 +17,7 @@ func SeedPortfolios(db *gorm.DB) []Portfolio {
 			},
 		},
 		{
-			ReferenceID: "portfolio-high-risk",
+			ReferenceID: configs.DefaultPortfolioHighRisk,
 			Name:        "High Risk",
 			Assets: []Asset{
 				{Name: "Bitcoin", Class: "Cryptocurrency"},

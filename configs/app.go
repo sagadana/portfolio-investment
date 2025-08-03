@@ -10,10 +10,6 @@ import (
 )
 
 func GetEnv(key string) string {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatal("Failed to load .env file")
-	}
 	return os.Getenv(key)
 }
 
@@ -35,6 +31,9 @@ func GetAppConfigs() *AppConfig {
 	once.Do(func() {
 		var dsn string
 		var dbType DBType
+
+		// Load environment variables from .env file if it exists
+		godotenv.Load()
 
 		// Parse DSN
 		if dsn = GetEnv("DB_FILE_PATH"); dsn != "" {
@@ -64,8 +63,6 @@ func GetAppConfigs() *AppConfig {
 			DatabaseAutoMigrate: GetEnv("DB_AUTO_MIGRATE") == "true" || GetEnv("DB_AUTO_MIGRATE") == "1",
 			DatabaseAutoSeed:    GetEnv("DB_AUTO_SEED") == "true" || GetEnv("DB_AUTO_SEED") == "1",
 		}
-
-		fmt.Printf("App Configs: %+v\n", appConfig)
 	})
 	return appConfig
 }
