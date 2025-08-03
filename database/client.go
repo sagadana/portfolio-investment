@@ -28,63 +28,10 @@ func Migrate(db *gorm.DB) {
 }
 
 func Seed(db *gorm.DB) {
-
 	// Seed Portfolios
 	portfolios := SeedPortfolios(db)
-
 	// Seed User
-	user := SeedUser(db)
-
-	// Seed User Portfolios & Deposit Plans
-	var userPortfolios []UserPortfolio
-	var userDepositPlans []UserDepositPlan
-
-	for _, portfolio := range portfolios {
-		switch portfolio.ReferenceID {
-		case configs.DefaultPortfolioRetirement:
-			userPortfolio := UserPortfolio{
-				User:      user,
-				Portfolio: portfolio,
-				Fund:      0,
-			}
-			oneTimePlan := UserDepositPlan{
-				User:      user,
-				Type:      configs.PlanTypeOnceTime,
-				Portfolio: portfolio,
-				Amount:    500.0,
-			}
-			monthlyPlan := UserDepositPlan{
-				User:      user,
-				Type:      configs.PlanTypeMonthly,
-				Portfolio: portfolio,
-				Amount:    100.0,
-			}
-			userPortfolios = append(userPortfolios, userPortfolio)
-			userDepositPlans = append(userDepositPlans, oneTimePlan, monthlyPlan)
-		case configs.DefaultPortfolioHighRisk:
-			userPortfolio := UserPortfolio{
-				User:      user,
-				Portfolio: portfolio,
-				Fund:      0,
-			}
-			oneTimePlan := UserDepositPlan{
-				User:      user,
-				Type:      configs.PlanTypeOnceTime,
-				Portfolio: portfolio,
-				Amount:    10000.0,
-			}
-			monthlyPlan := UserDepositPlan{
-				User:      user,
-				Type:      configs.PlanTypeMonthly,
-				Portfolio: portfolio,
-				Amount:    0.0,
-			}
-			userPortfolios = append(userPortfolios, userPortfolio)
-			userDepositPlans = append(userDepositPlans, oneTimePlan, monthlyPlan)
-		}
-	}
-	SeedUserPortfolios(db, &userPortfolios)
-	SeedUserDepositPlans(db, &userDepositPlans)
+	SeedUser(db, "user-123", portfolios)
 }
 
 func Connect() *gorm.DB {

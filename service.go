@@ -56,7 +56,7 @@ func ProcessFunds(
 		}
 	}
 	if len(validFunds) == 0 {
-		fmt.Printf("No valid fund(s)")
+		fmt.Println("No valid fund(s)")
 		return nil, nil
 	}
 

@@ -10,7 +10,7 @@ import (
 func TestProcessFunds(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer func() {
-		time.Sleep(5 * time.Second) // Wait for logs
+		time.Sleep(2 * time.Second) // Wait for logs
 		cancel()
 	}()
 

@@ -40,13 +40,64 @@ func SeedPortfolios(db *gorm.DB) []Portfolio {
 	return portfolios
 }
 
-func SeedUser(db *gorm.DB) User {
-	user := User{ReferenceID: "user-123"}
+func SeedUser(db *gorm.DB, userReferenceID string, portfolios []Portfolio) (*User, *[]UserPortfolio, *[]UserDepositPlan) {
+	user := User{ReferenceID: userReferenceID}
 	if err := db.Create(&user).Error; err != nil {
 		panic("Failed to seed user: " + err.Error())
 	}
 
-	return user
+	// Seed User Portfolios & Deposit Plans
+	var userPortfolios []UserPortfolio
+	var userDepositPlans []UserDepositPlan
+
+	for _, portfolio := range portfolios {
+		switch portfolio.ReferenceID {
+		case configs.DefaultPortfolioRetirement:
+			userPortfolio := UserPortfolio{
+				User:      user,
+				Portfolio: portfolio,
+				Fund:      0,
+			}
+			oneTimePlan := UserDepositPlan{
+				User:      user,
+				Type:      configs.PlanTypeOnceTime,
+				Portfolio: portfolio,
+				Amount:    500.0,
+			}
+			monthlyPlan := UserDepositPlan{
+				User:      user,
+				Type:      configs.PlanTypeMonthly,
+				Portfolio: portfolio,
+				Amount:    100.0,
+			}
+			userPortfolios = append(userPortfolios, userPortfolio)
+			userDepositPlans = append(userDepositPlans, oneTimePlan, monthlyPlan)
+		case configs.DefaultPortfolioHighRisk:
+			userPortfolio := UserPortfolio{
+				User:      user,
+				Portfolio: portfolio,
+				Fund:      0,
+			}
+			oneTimePlan := UserDepositPlan{
+				User:      user,
+				Type:      configs.PlanTypeOnceTime,
+				Portfolio: portfolio,
+				Amount:    10000.0,
+			}
+			monthlyPlan := UserDepositPlan{
+				User:      user,
+				Type:      configs.PlanTypeMonthly,
+				Portfolio: portfolio,
+				Amount:    0.0,
+			}
+			userPortfolios = append(userPortfolios, userPortfolio)
+			userDepositPlans = append(userDepositPlans, oneTimePlan, monthlyPlan)
+		}
+	}
+	SeedUserPortfolios(db, &userPortfolios)
+	SeedUserDepositPlans(db, &userDepositPlans)
+
+	return &user, &userPortfolios, &userDepositPlans
 }
 
 func SeedUserPortfolios(db *gorm.DB, userPortfolios *[]UserPortfolio) {
