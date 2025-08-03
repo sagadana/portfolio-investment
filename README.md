@@ -5,7 +5,10 @@ Manage Portfolio Investments
 ## Prerequisites
 
 - Docker
-- Golang 1.24.5
+
+## Set up
+
+Copy `.env.example` into `.env`
 
 ## Test
 
