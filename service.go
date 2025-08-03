@@ -57,7 +57,7 @@ func ProcessFunds(
 	}
 	if len(validFunds) == 0 {
 		fmt.Println("No valid fund(s)")
-		return nil, nil
+		return make(map[string]float64), nil
 	}
 
 	// Create a transaction for the deposit

@@ -237,7 +237,8 @@ func DepositFunds(
 				splitFund := remainingFund / 2
 
 				if len(oneTimePlans) > 0 {
-					fmt.Printf("\t- Equally splitting: Depositing %.2f to one-time plans for user %s\n", splitFund, transaction.User.ReferenceID)
+					fmt.Printf("\t- Equally splitting: Depositing %.2f of %.2f to one-time plans for user %s\n",
+						splitFund, remainingFund, transaction.User.ReferenceID)
 					oneTimeResult, err := allocateFunds(tx, oneTimePlans, &transaction, splitFund)
 					if err != nil {
 						return fmt.Errorf("failed to deposit to one-time plans in split: %w", err)
@@ -248,8 +249,10 @@ func DepositFunds(
 				}
 
 				if len(monthlyPlans) > 0 {
-					fmt.Printf("\t- Equally splitting: Depositing %.2f to monthly plans for user %s\n", splitFund, transaction.User.ReferenceID)
-					monthlyResult, err := allocateFunds(tx, monthlyPlans, &transaction, splitFund)
+					leftOverFund := remainingFund - splitFund
+					fmt.Printf("\t- Equally splitting: Depositing %.2f of %.2f to monthly plans for user %s\n",
+						leftOverFund, remainingFund, transaction.User.ReferenceID)
+					monthlyResult, err := allocateFunds(tx, monthlyPlans, &transaction, leftOverFund)
 					if err != nil {
 						return fmt.Errorf("failed to deposit to monthly plans in split: %w", err)
 					}

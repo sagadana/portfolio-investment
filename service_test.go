@@ -3,9 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 	"time"
 )
+
+func roundFloat(val float64, precision uint) float64 {
+	ratio := math.Pow(10, float64(precision))
+	return math.Round(val*ratio) / ratio
+}
 
 func TestProcessFunds(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -33,7 +39,9 @@ func TestProcessFunds(t *testing.T) {
 			funds := tt.funds
 			totalFunds := 0.0
 			for _, fund := range funds {
-				totalFunds += fund
+				if fund > 0 {
+					totalFunds += fund
+				}
 			}
 
 			fmt.Println("\n----------------------------------------------------------------------------------------------------")
@@ -60,6 +68,7 @@ func TestProcessFunds(t *testing.T) {
 			fmt.Printf("📌 New total funds: %v\n", newTotals)
 
 			// Check if the new totals are greater than the old totals
+			totalAllocated := 0.0
 			for portfolioReferenceID, resultTotal := range resultTotals {
 				oldTotal, oldTotalExists := oldTotals[portfolioReferenceID]
 				newTotal, newTotalExists := newTotals[portfolioReferenceID]
@@ -77,6 +86,17 @@ func TestProcessFunds(t *testing.T) {
 					t.Logf("✅ Portfolio '%s' total funds increased as expected: %.2f (old: %.2f)",
 						portfolioReferenceID, resultTotal, oldTotal)
 				}
+
+				// Calculate total allocated funds
+				if resultTotal > 0 {
+					totalAllocated += (resultTotal - oldTotal)
+				}
+			}
+
+			if totalFunds > 0 && roundFloat(totalAllocated, 4) != roundFloat(totalFunds, 4) {
+				t.Errorf("❌ Total allocated funds (%f) do not match expected total funds (%f)", totalAllocated, totalFunds)
+			} else {
+				t.Logf("✅ Total allocated funds match expected total funds: %f", totalAllocated)
 			}
 
 			fmt.Print("----------------------------------------------------------------------------------------------------\n\n")
