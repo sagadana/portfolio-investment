@@ -28,8 +28,9 @@ func TestProcessFunds(t *testing.T) {
 	}{
 		{"Test with valid happy case whole number funds", []float64{10500.0, 100.0}},
 		{"Test with valid decimal funds", []float64{10500.50, 100.25}},
+		{"Test with valid prime decimal funds", []float64{10501.37, 100.73}},
 		{"Test with valid mixed funds", []float64{10500.0, 100.25, 200.75}},
-		{"Test with large fund", []float64{100000.0}},
+		{"Test with large funds", []float64{100000.0, 3000050025.0}},
 		{"Test with zero fund", []float64{0.0}},
 		{"Test with negative fund", []float64{-100.0}},
 		{"Test with mixed valid and invalid funds", []float64{10500.0, -100.0, 200.0, 0.0, 300.75}},
@@ -76,8 +77,6 @@ func TestProcessFunds(t *testing.T) {
 					t.Errorf("❌ Portfolio ID %s does not exist in old totals", portfolioReferenceID)
 				} else if !newTotalExists {
 					t.Errorf("❌ Portfolio ID %s does not exist in new totals", portfolioReferenceID)
-				} else if resultTotal < oldTotal {
-					t.Errorf("❌ Expected total funds for portfolio '%s' to increase, but got %.2f (old: %.2f)", portfolioReferenceID, resultTotal, oldTotal)
 				} else if resultTotal < oldTotal {
 					t.Errorf("❌ Expected total funds for portfolio '%s' to increase, but got %.2f (old: %.2f)", portfolioReferenceID, resultTotal, oldTotal)
 				} else if resultTotal != newTotal {
