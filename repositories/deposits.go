@@ -83,8 +83,8 @@ func allocateFunds(
 			remainder = 0
 		}
 
-		fmt.Printf("\t\t- Allocated %f to '%s' deposit plan. Total: %f, Remainder: %f\n",
-			deposit.Amount, plan.Portfolio.ReferenceID, results[plan.Portfolio.ReferenceID], remainder)
+		fmt.Printf("\t\t- Allocated %f to '%s' deposit plan. Ratio: %.4f, Plan: %.2f, Total: %.2f, Remainder: %.2f\n",
+			deposit.Amount, plan.Portfolio.ReferenceID, ratio, plan.Amount, results[plan.Portfolio.ReferenceID], remainder)
 
 		if remainder <= 0 {
 			break
