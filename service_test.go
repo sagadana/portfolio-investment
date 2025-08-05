@@ -16,7 +16,7 @@ func roundFloat(val float64, precision uint) float64 {
 func TestProcessFunds(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer func() {
-		time.Sleep(2 * time.Second) // Wait for logs
+		time.Sleep(1 * time.Second) // Wait for logs
 		cancel()
 	}()
 
